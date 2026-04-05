@@ -1,0 +1,14 @@
+{
+  "name": "project-harness",
+  "owner": {
+    "name": "justneedsomelittlehelp"
+  },
+  "plugins": [
+    {
+      "name": "project-harness",
+      "source": "./plugins/project-harness",
+      "description": "Structured AI-coding harness — phase roadmap, architecture docs, CLAUDE.md routing table, and self-maintaining context system for Claude Code.",
+      "version": "1.0.0"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "project-harness",
+  "description": "Set up a structured AI-coding harness for any software project — phase roadmap, architecture docs, CLAUDE.md navigation hub, and self-maintaining context system.",
+  "version": "1.0.0",
+  "author": {
+    "name": "justneedsomelittlehelp"
+  },
+  "repository": "https://github.com/justneedsomelittlehelp/project-harness",
+  "license": "MIT",
+  "keywords": ["project-setup", "documentation", "harness", "architecture", "claude-code"]
+}

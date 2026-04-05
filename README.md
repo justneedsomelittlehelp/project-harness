@@ -24,14 +24,25 @@ This harness solves that by creating a structured documentation layer that Claud
 
 ## Installation
 
-### As a Claude Code skill (recommended)
+### Via plugin system (recommended)
+
+```bash
+# Step 1: Add the marketplace
+/plugin marketplace add justneedsomelittlehelp/project-harness
+
+# Step 2: Install the plugin
+/plugin install project-harness@project-harness
+```
+
+### Manual installation
 
 Copy the `SKILL.md` file to your Claude Code skills directory:
 
 ```bash
 # Global (available in all projects)
 mkdir -p ~/.claude/skills/project-harness
-cp SKILL.md ~/.claude/skills/project-harness/
+curl -o ~/.claude/skills/project-harness/SKILL.md \
+  https://raw.githubusercontent.com/justneedsomelittlehelp/project-harness/main/plugins/project-harness/skills/project-harness/SKILL.md
 
 # Or project-local
 mkdir -p .claude/skills/project-harness
@@ -71,8 +82,8 @@ your-project/
 │   ├── PHASE_2.md
 │   └── ...
 ├── architecture_docs/
-│   ├���─ arch-identity-access.md        # Auth, permissions, middleware
-��   ├── arch-{core-workflow}.md        # Your project's main flow
+│   ├── arch-identity-access.md        # Auth, permissions, middleware
+│   ├── arch-{core-workflow}.md        # Your project's main flow
 │   ├── arch-{integrations}.md         # External APIs, services
 │   └── arch-reference.md              # File map, schema, route table
 ├── Design.md                          # (UI projects only)
