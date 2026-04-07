@@ -1,13 +1,15 @@
 ---
 name: project-harness
+version: 1.1.0
 description: >
   Set up a structured AI-coding harness for any software project — phase roadmap, architecture docs,
   CLAUDE.md navigation hub, design system doc, security doc, and memory index. Use this skill whenever
   the user says "set up a project", "start a new project", "create a harness", "scaffold docs",
   "set up CLAUDE.md", or wants to organize their codebase for AI-assisted development. Also trigger
   when the user wants to add structure to an existing project ("add architecture docs", "organize this
-  project", "make this codebase AI-friendly", "set up project docs"). Works for any tech stack and
-  any project size.
+  project", "make this codebase AI-friendly", "set up project docs"), or when the user wants to
+  upgrade an existing harness ("upgrade harness", "update harness", "patch harness"). Works for any
+  tech stack and any project size.
 ---
 
 # Project Harness
@@ -56,16 +58,57 @@ security_check/. Recommend what fits — don't force components that add no valu
 - Identify what documentation already exists and what's missing
 - Ask the user what pain points they're hitting (context loss between sessions? inconsistent patterns? hard to onboard contributors?)
 
-### Step 2: Tech Stack Selection (new projects only)
+**If an existing harness is detected**, check for upgrade needs before proceeding — see Step 1b.
 
-If the user already has a firm tech stack, confirm it and move on. If they're open to suggestions:
+### Step 1b: Upgrade an Existing Harness
+
+If the project already has a harness (CLAUDE.md with a routing table + `architecture_docs/` + `roadmap/`),
+check whether it was created by an older version of this skill and patch in missing components.
+
+**Detection**: Look for these signs of an older harness:
+
+| Missing component | Introduced in | What to do |
+|-------------------|---------------|------------|
+| `architecture_docs/arch-foundations.md` | v1.1.0 | Create it — gather stack rationale from the user and existing CLAUDE.md Tech Stack section |
+| CLAUDE.md Tech Stack has no "Why" column | v1.1.0 | Add the "Why" column to the existing table, ask user for rationale per choice |
+| No routing table entry for `arch-foundations.md` | v1.1.0 | Add the row to the routing table |
+| No "Technology added, removed, or swapped" row in maintenance rules | v1.1.0 | Add it to the "When to Update What" table in CLAUDE.md |
+
+**Upgrade rules:**
+
+1. **Never overwrite existing content.** Read every file before modifying. Merge new sections into
+   existing structure — don't replace files wholesale.
+2. **Preserve user customizations.** If the user has added custom routing table rows, extra
+   maintenance rules, or modified templates, keep all of it.
+3. **Only patch what's missing.** If a component already exists and looks complete, skip it.
+4. **Tell the user what you're doing.** Before making changes, present a list of what's missing
+   and what you'll add. Wait for confirmation.
+5. **One-shot upgrade.** After patching, the harness should be fully current — no need to run
+   the upgrade again.
+
+If the user explicitly asked to upgrade (e.g., "upgrade harness"), run only Step 1b and skip
+the rest of the skill. If they asked to set up a harness and you detected an existing one,
+ask whether they want a full rebuild or just an upgrade.
+
+### Step 2: Tech Stack Selection & Rationale
+
+**If starting a new project and the user is open to suggestions:**
 
 1. Based on the project description, propose a stack with clear reasoning for each choice
 2. Cover: framework, language, database, auth, deployment, package manager
 3. Explain trade-offs honestly — don't just pick the trendiest option
 4. Wait for the user to confirm before proceeding
 
-Document the chosen stack and reasoning — this becomes the Tech Stack section of CLAUDE.md.
+**If the user already has a firm tech stack (new or existing project):**
+
+1. Confirm each major choice (framework, language, database, auth, deployment)
+2. Ask *why* each was chosen — constraints, team expertise, performance needs, ecosystem, cost, etc.
+3. If the user doesn't know or care about the reasoning, note that too (e.g., "inherited from previous team")
+
+**In both cases**, document every stack choice with its rationale. This information feeds into
+the Tech Stack section of CLAUDE.md (brief) and `arch-foundations.md` (detailed). Capturing
+the "why" prevents future sessions from re-debating settled decisions or suggesting incompatible
+alternatives.
 
 ### Step 3: Design the Phase Roadmap
 
@@ -125,7 +168,54 @@ would need deep context to make changes safely. Common splits:
 - **Data & storage** — schema design, file handling, caching
 - **Public surface** — API endpoints, webhooks, public pages
 
-For each domain, create `architecture_docs/arch-{domain}.md`:
+**Every project also gets `architecture_docs/arch-foundations.md`** — this is the tech stack
+rationale doc. It captures what was chosen, why, what alternatives were considered, and any
+constraints that drove the decisions. Structure:
+
+```markdown
+# Foundations & Tech Stack
+
+> **Read this when:** choosing a new library/tool, evaluating an alternative technology,
+> onboarding to the project, or questioning why a particular stack choice was made.
+> **Related docs:** all other arch docs (they assume this stack)
+
+---
+
+## Stack Overview
+
+| Layer | Choice | Why |
+|-------|--------|-----|
+| Language | [e.g., TypeScript] | [e.g., team expertise + type safety for complex domain] |
+| Framework | [e.g., Next.js 14] | [e.g., SSR for SEO + API routes reduce infra complexity] |
+| Database | [e.g., PostgreSQL] | [e.g., relational data model, JSONB for flexible metadata] |
+| Auth | [e.g., NextAuth.js] | [e.g., built-in OAuth providers, session management] |
+| Deployment | [e.g., Vercel] | [e.g., zero-config Next.js deploys, preview environments] |
+| Package manager | [e.g., pnpm] | [e.g., faster installs, strict dependency resolution] |
+
+## Key Decisions & Trade-offs
+
+For each non-obvious stack choice, document:
+- **What was chosen** and **what was considered**
+- **Why this option won** (constraints, team skills, cost, ecosystem, performance)
+- **Known trade-offs** accepted with this choice
+
+## Constraints
+
+[Hard constraints that limit future stack decisions — e.g., "must run on AWS due to
+enterprise contract", "must support offline-first for field workers", "budget caps
+rule out per-seat SaaS tools"]
+
+## Stack Evolution Log
+
+| Date | Change | Reason |
+|------|--------|--------|
+| [date] | [e.g., Migrated from Jest to Vitest] | [e.g., 3x faster test runs, native ESM support] |
+```
+
+This doc is a living record. When a technology is added, removed, or swapped, update the
+Stack Overview table and add an entry to the Stack Evolution Log (see Step 9 maintenance rules).
+
+For each **project-specific domain**, create `architecture_docs/arch-{domain}.md`:
 
 ```markdown
 # [Domain Name]
@@ -173,7 +263,16 @@ everything else. Target structure:
 > [One-line description of what this project is]
 
 ## Tech Stack
-[Framework, language, database, deployment — with versions]
+
+| Layer | Choice | Why |
+|-------|--------|-----|
+| Language | [e.g., TypeScript 5.x] | [one-line rationale] |
+| Framework | [e.g., Next.js 14] | [one-line rationale] |
+| Database | [e.g., PostgreSQL 16] | [one-line rationale] |
+| Auth | [e.g., NextAuth.js] | [one-line rationale] |
+| Deployment | [e.g., Vercel] | [one-line rationale] |
+
+> Full stack rationale, trade-offs, and evolution log → `architecture_docs/arch-foundations.md`
 
 ## Project Structure
 [Brief description of directory layout]
@@ -184,6 +283,7 @@ Read the relevant doc before modifying backend logic, API routes, or data flow:
 
 | When working on | Read |
 |----------------|------|
+| Choosing a library/tool, questioning a stack choice, onboarding | `arch-foundations.md` |
 | [scenario] | `arch-{domain}.md` |
 | [scenario] | `arch-{domain}.md` |
 | [scenario] | `arch-{domain}.md` |
@@ -275,6 +375,7 @@ This project uses a structured documentation harness. Follow these rules to keep
 | Event | Update |
 |-------|--------|
 | Architecture decision made or changed | Update the relevant `architecture_docs/arch-{domain}.md` with the decision and reasoning |
+| Technology added, removed, or swapped | Update `arch-foundations.md` Stack Overview table + add a Stack Evolution Log entry. Update the Tech Stack table in CLAUDE.md to match |
 | New doc or reference file added | Add a routing entry to the "When working on / Read" table above |
 | Phase completed | Mark phase as done in `roadmap/README.md`, update Build Status section below |
 | New phase or scope change | Create/update `roadmap/PHASE_N.md`, update roadmap README |
@@ -290,6 +391,8 @@ This project uses a structured documentation harness. Follow these rules to keep
   paragraphs, move details to a dedicated doc and leave a pointer here.
 - **Architecture docs** — Detailed reasoning, flows, data models, edge cases. This is where
   the "why" behind decisions lives. Update these as decisions are made during development.
+  `arch-foundations.md` specifically owns tech stack rationale — always update it (and CLAUDE.md's
+  Tech Stack table) when a technology is added, removed, or changed.
 - **MEMORY.md** — Brief one-line pointers to docs + things NOT derivable from code or git
   history (e.g., "auth middleware rewrite driven by legal compliance, not tech debt").
   Never duplicate content from architecture docs here.
@@ -346,3 +449,24 @@ a few paragraphs, it should become its own doc with a pointer from CLAUDE.md.
 A solo developer needs different docs than a team of 10. Scale the harness to match the project's
 actual complexity — over-documenting a simple project creates maintenance burden that outweighs
 the benefit.
+
+---
+
+## Changelog
+
+### v1.1.0
+
+- **Tech stack rationale**: Step 2 now captures *why* each stack choice was made, for both new
+  and existing projects. CLAUDE.md Tech Stack table includes a "Why" column.
+- **`arch-foundations.md`**: New mandatory architecture doc for every project — full stack
+  rationale, trade-offs, constraints, and a Stack Evolution Log for tracking changes over time.
+- **Maintenance rules**: Added tech stack change trigger — when a technology is added, removed,
+  or swapped, both `arch-foundations.md` and CLAUDE.md Tech Stack table must be updated.
+- **Upgrade path (Step 1b)**: Detects existing harnesses from older versions and patches in
+  missing components without overwriting user content. Supports "upgrade harness" trigger.
+- **Versioning**: Added `version` field to skill frontmatter.
+
+### v1.0.0
+
+- Initial release: phase roadmap, architecture docs, CLAUDE.md navigation hub, design system
+  doc, security doc, memory index, and self-maintaining harness cycle.
