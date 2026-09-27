@@ -138,6 +138,7 @@ Read the relevant doc before modifying backend logic, API routes, or data flow:
 | [scenario] | `arch-{domain}.md` |
 | [scenario] | `arch-{domain}.md` |
 | Looking up a table/column, finding a file | `arch-reference.md` |
+| Maintaining the harness, phase boundary audit | `arch-harness.md` |
 
 ## Domain Rules (in `.claude/rules/`)
 
@@ -195,37 +196,153 @@ paths:
 Full reasoning, state machine, and edge cases → `architecture_docs/arch-payments.md`
 ```
 
-## Harness Maintenance section of CLAUDE.md
+## Standard rule files (`.claude/rules/`)
 
-*Used by Step 9. Sections: When to Update What / Where Information Lives / Deferred Components / Phase Boundary Audit / The Self-Improvement Cycle.*
+*Used by Step 5b. Beyond one rule per architecture domain, generate these. Each one mechanizes a
+maintenance trigger that would otherwise be an advisory table row nobody reads at the right moment.
+Adjust every glob to the project's real tree and delete any that don't apply.*
+
+### `harness.md` — keeps the harness itself in sync
 
 ```markdown
-## Harness Maintenance
+---
+paths:
+  - "CLAUDE.md"
+  - "architecture_docs/**"
+  - "roadmap/**"
+  - ".claude/rules/**"
+---
 
-This project uses a structured documentation harness. Follow these rules to keep it accurate:
+# Harness Invariants
 
-### When to Update What
+- Changed a domain's invariants? Update BOTH `.claude/rules/{domain}.md` and the Invariants block in its arch doc
+- Added an arch doc? Add its routing table row in CLAUDE.md
+- Arch doc past ~500 lines? Split by sub-domain and repoint the routing rows
+- CLAUDE.md past ~150 lines? Move a section out, leave a routing row behind
+- Completed a phase? Update Current Phase and Build Status, then run the Phase Boundary Audit
+
+Full procedure → `architecture_docs/arch-harness.md`
+```
+
+### `dependencies.md` — keeps the stack rationale honest
+
+```markdown
+---
+paths:
+  - "package.json"
+  - "pnpm-lock.yaml"
+  - "pyproject.toml"
+  - "Cargo.toml"
+  - "go.mod"
+---
+
+# Dependency Invariants
+
+- Added, removed, or upgraded a dependency? Add a Stack Evolution Log entry in `arch-foundations.md`
+- Changed a major layer (framework, database, auth, deployment)? Update the Stack Overview table there
+  AND the Tech Stack table in CLAUDE.md — they must agree
+- [project-specific: approved license list, no new runtime deps without review, etc.]
+
+Full rationale and trade-offs → `architecture_docs/arch-foundations.md`
+```
+
+### `reference-sync.md` — keeps the lookup tables true
+
+```markdown
+---
+paths:
+  - "migrations/**"
+  - "prisma/schema.prisma"
+  - "src/app/api/**"
+---
+
+# Reference Sync
+
+- Schema change? Update the schema section of `arch-reference.md` in the same commit
+- New, renamed, or deleted route? Update the routes table in `arch-reference.md`
+- `arch-reference.md` is the authority for tables, columns, routes, and paths. When it disagrees with
+  another doc, fix `arch-reference.md` first, then the doc that drifted
+
+Full lookup tables → `architecture_docs/arch-reference.md`
+```
+
+### `design.md` — only if `Design.md` exists
+
+```markdown
+---
+paths:
+  - "src/components/**"
+  - "**/*.css"
+---
+
+# Design Invariants
+
+- [the project's non-negotiables: color tokens only, spacing scale, no dark mode, etc.]
+- New or changed component? Update the component patterns AND the file list in `Design.md`
+- Never introduce a one-off color or spacing value — extend the system instead
+
+Full spec with copy-paste code → `Design.md`
+```
+
+### `security.md` — only if `security_check/SECURITY.md` exists
+
+```markdown
+---
+paths:
+  - "src/auth/**"
+  - "src/app/api/**"
+  - "middleware.*"
+  - "**/*.env*"
+---
+
+# Security Invariants
+
+- [the project's invariants: validate at the boundary, never log PII, no secrets client-side, etc.]
+- Vulnerability found or fixed? Add a numbered entry to `security_check/SECURITY.md` with the date
+  and the fix location
+- Never widen an auth check to make a test pass
+
+Full threat model and audit trail → `security_check/SECURITY.md`
+```
+
+## Harness maintenance doc (`architecture_docs/arch-harness.md`)
+
+*Used by Step 9. The full procedure — lives in the repo, read on demand, gets a routing table row
+like any other arch doc.*
+
+```markdown
+# Harness Maintenance
+
+> **Read this when:** finishing a phase, recording a decision, adding a doc, or auditing whether the
+> harness still matches the codebase.
+> **Does NOT cover:** what any individual domain does — that's the routing table in CLAUDE.md.
+> **Related docs:** every doc in `architecture_docs/` (this one governs how they stay current)
+
+## Invariants
+
+- Every architecture doc has a routing table row in CLAUDE.md
+- Every domain rule file's invariants match the Invariants block in its arch doc
+- No fact lives in two places
+- CLAUDE.md <=150 lines, rule files <=50, arch docs <=500
+
+---
+
+## When to Update What
+
+File-edit triggers live in `.claude/rules/` and fire on their own. These depend on a conversation
+rather than a file change, so they need deliberate attention:
 
 | Event | Update |
 |-------|--------|
-| Architecture decision made or changed | Update the relevant `architecture_docs/arch-{domain}.md` with the decision and reasoning |
-| Technology added, removed, or swapped | Update `arch-foundations.md` Stack Overview table + add a Stack Evolution Log entry. Update the Tech Stack table in CLAUDE.md to match |
-| New doc or reference file added | Add a routing entry to the "When working on / Read" table above |
-| Phase completed | Mark phase as done in `roadmap/README.md`, update Build Status section below |
-| New phase or scope change | Create/update `roadmap/PHASE_N.md`, update roadmap README |
-| Non-obvious decision worth preserving across sessions | Record it in the relevant `architecture_docs/arch-{domain}.md` — or `arch-foundations.md` if it's a stack choice. Only if it fits no doc, add one line here |
-| New database table or column | Update `arch-reference.md` schema section |
-| New API route | Update `arch-reference.md` routes table |
-| UI component added or changed | Update `Design.md` component patterns and file list *(if it exists)* |
-| Security vulnerability found or fixed | Update `security_check/SECURITY.md` with numbered entry *(if it exists)* |
-| A deferred component is created | Add its routing table row above, remove it from Deferred Components below |
-| Domain invariant added or changed | Update BOTH `.claude/rules/{domain}.md` and the Invariants block in `architecture_docs/arch-{domain}.md` |
-| An arch doc passes ~500 lines | Split it by sub-domain; point the routing rows at the splits |
-| CLAUDE.md passes ~150 lines | Move a section to an arch doc or domain rule, leave a routing row behind |
+| Architecture decision made or changed | The relevant `arch-{domain}.md`, with the reasoning |
+| New doc or reference file added | Add a routing table row in CLAUDE.md |
+| Phase completed | Mark done in `roadmap/README.md`, update Current Phase + Build Status |
+| New phase or scope change | Create/update `roadmap/PHASE_N.md`, update the roadmap README |
+| Non-obvious decision worth preserving | The relevant arch doc — `arch-foundations.md` if it's a stack choice |
+| A deferred component is created | Add its routing row, remove it from Deferred Components |
 | New directory or module created | Check whether an existing rule file's `paths` should cover it |
-| Phase started | Update the Current Phase section to point at the new `PHASE_N.md` |
 
-### Where Information Lives (don't put things in the wrong place)
+## Where Information Lives (don't put things in the wrong place)
 
 - **CLAUDE.md** — Navigation + quick rules. Keep it scannable. If a section grows beyond a few
   paragraphs, move details to a dedicated doc and leave a pointer here.
@@ -241,7 +358,7 @@ This project uses a structured documentation harness. Follow these rules to keep
 - **Roadmap phases** — Execution specs. Once a phase is complete, don't modify it (it's a
   historical record). Update the README status instead.
 
-### Deferred Components
+## Deferred Components
 
 Optional harness components that were intentionally postponed, and what should trigger creating them:
 
@@ -252,7 +369,7 @@ Optional harness components that were intentionally postponed, and what should t
 
 Delete a row once the doc exists. If nothing is deferred, delete this section.
 
-### Phase Boundary Audit
+## Phase Boundary Audit
 
 At the end of every phase, before starting the next, run this check. It's what keeps the harness
 from rotting into confidently wrong documentation:
@@ -270,7 +387,7 @@ from rotting into confidently wrong documentation:
    saying "currently migrating X" is actively misleading once the migration is done. Nothing prunes
    these automatically.
 
-### The Self-Improvement Cycle
+## The Self-Improvement Cycle
 
 After completing significant work (finishing a phase, making an architecture decision, fixing
 a security issue), update the harness before moving on:
@@ -282,26 +399,41 @@ a security issue), update the harness before moving on:
 5. Mark the phase complete in the roadmap if applicable
 ```
 
-## Delegation rules section of CLAUDE.md
+## Harness Maintenance trigger (in CLAUDE.md)
 
-*Used by Step 9b. Sections: delegate-vs-do-it-yourself table / the name-the-docs-explicitly rule.*
+*Used by Step 9. The always-loaded part: conversational triggers only, plus a pointer. Pasting the
+full procedure here would spend over half the 150-line CLAUDE.md budget on instructions about the
+docs rather than the project.*
 
 ```markdown
-### When to Delegate to a Subagent
+## Harness Maintenance
 
-Hand these off rather than reading everything into the main session:
+Full procedure, placement rules, and the phase-boundary audit → `architecture_docs/arch-harness.md`
 
-| Task | Why delegate |
-|------|--------------|
-| "Where is X used / what breaks if I change it" | Sweeps many files; you need the answer, not the files |
-| Questions spanning 3+ architecture domains | Reading every doc costs more than the answer is worth |
-| Auditing a convention across the codebase | Bounded output, unbounded input |
-| Reproducing a bug in unfamiliar code | Exploration cost stays out of the main context |
+File-edit triggers fire automatically from `.claude/rules/`. These need a deliberate decision:
 
-Do it yourself when the work sits inside one domain you already have context for, or when the
-answer needs fewer than ~3 file reads.
+| Event | Update |
+|-------|--------|
+| Architecture decision made | The relevant `arch-{domain}.md`, with the reasoning |
+| New doc added | Add a routing table row above |
+| Phase completed or started | `roadmap/README.md` + Current Phase + Build Status |
+| A deferred component is created | Add its routing row, clear it from the deferred list |
 
-**When delegating, name the docs explicitly in the prompt.** A subagent may not inherit this file,
-so spell it out: "read `architecture_docs/arch-payments.md` and `arch-reference.md`, then …".
-Don't assume the routing table came along.
+At every phase boundary, run the Phase Boundary Audit in `arch-harness.md`.
+```
+
+## Delegation (in CLAUDE.md)
+
+*Used by Step 9b. Stays always-loaded: the choice to delegate happens before any file is
+opened, so there is no read to route on and no file edit to trigger on.*
+
+```markdown
+## Delegation
+
+Hand off to a subagent with its own context window when the work is a codebase-wide sweep ("where is
+X used", "audit this convention"), a question spanning 3+ architecture domains, or diagnosing a bug
+in unfamiliar code. Do it inline when the work sits in one domain you already have context for, or
+needs under ~3 file reads.
+
+When delegating, name the docs in the prompt — a subagent may not inherit this file.
 ```

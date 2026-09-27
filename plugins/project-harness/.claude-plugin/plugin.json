@@ -1,7 +1,7 @@
 {
   "name": "project-harness",
   "description": "Set up a structured AI-coding harness for any software project — phase roadmap, architecture docs, CLAUDE.md navigation hub, and self-maintaining context system.",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "author": {
     "name": "justneedsomelittlehelp"
   },

@@ -1,6 +1,6 @@
 ---
 name: project-harness
-version: 1.4.0
+version: 1.5.0
 description: >
   Set up a structured AI-coding harness for any software project — phase roadmap, architecture docs,
   CLAUDE.md navigation hub, path-scoped domain rules, design system doc, and security doc. Use this
@@ -296,6 +296,26 @@ Rules for generating these:
 *reads a matching file*, so they cover implementation but not planning. The routing table is what
 gets the arch doc open before any file is touched. Generate both.
 
+**Mechanize every file-triggered maintenance rule.** This is the general form, and it applies well
+beyond domain invariants: **if a trigger is "you edited file X," it belongs in a rule, not in an
+advisory table.** Roughly half the harness's maintenance triggers are file-triggered — a dependency
+added to `package.json`, a migration written, a route added, a component changed, an arch doc grown
+past its budget. Each one moved into `.claude/rules/` fires on its own instead of depending on
+someone remembering a table row.
+
+So beyond the per-domain rules, generate a standard set:
+
+| Rule file | Fires when Claude edits | Enforces |
+|-----------|------------------------|----------|
+| `harness.md` | `CLAUDE.md`, `architecture_docs/**`, `roadmap/**`, `.claude/rules/**` | Invariant sync, routing rows, budgets |
+| `dependencies.md` | `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, lockfiles | `arch-foundations.md` + CLAUDE.md Tech Stack stay true |
+| `reference-sync.md` | migrations, schema files, route directories | `arch-reference.md` schema and routes tables stay true |
+| `design.md` *(if `Design.md` exists)* | component directories, stylesheets | Design invariants; component patterns + file list updated |
+| `security.md` *(if `SECURITY.md` exists)* | auth, api, middleware, env files | Security invariants; numbered audit entries |
+
+→ **Template:** `references/templates.md` § Standard rule files. Adjust every glob to the project's
+real tree — a pattern matching nothing is a rule that silently never fires.
+
 ### Step 6: Design System Doc (optional — only if confirmed in Step 1c)
 
 Skip this step unless the user asked for it. If they deferred it, make sure it's listed under
@@ -379,35 +399,43 @@ expanded and loaded at launch just like the rest of the file, so splitting conte
 it without saving any context. Use imports for always-relevant content you want in its own file,
 never to smuggle long reference docs into every session.
 
-### Step 9: Write Harness Maintenance Rules into CLAUDE.md
+### Step 9: Harness Maintenance Rules
 
-The harness is only useful if future Claude sessions know how to maintain it. Without explicit
-instructions, the docs go stale after a few sessions and become misleading — worse than no docs.
+The harness is only useful if future sessions know how to maintain it. Without that, the docs go
+stale within a few sessions and become misleading — worse than no docs.
 
-Add a **Harness Maintenance** section to CLAUDE.md that encodes the self-improvement cycle.
-This section tells every future Claude session how to keep the harness alive:
+The maintenance rules are themselves subject to the harness's own budget, so they split across three
+places rather than being pasted into CLAUDE.md:
 
-→ **Template:** `references/templates.md` § Harness Maintenance section of CLAUDE.md. Read it before writing the section.
-Sections: When to Update What / Where Information Lives / Deferred Components / Phase Boundary Audit / The Self-Improvement Cycle.
+1. **`architecture_docs/arch-harness.md`** — the full procedure: the event table, where information
+   lives, deferred components, the Phase Boundary Audit, the self-improvement cycle. An arch doc like
+   any other, with its own routing table row, read on demand.
+2. **~13 lines in CLAUDE.md** — only the triggers that depend on a conversation rather than a file
+   edit, plus a pointer to the doc. The full procedure pasted here runs 80 lines: over half of the
+   150-line budget spent on instructions about the docs instead of the project.
+3. **`.claude/rules/harness.md`** — the file-edit triggers, firing automatically when Claude touches
+   CLAUDE.md, an arch doc, the roadmap, or a rule file. This is what makes maintenance mechanical
+   instead of advisory. Editing an arch doc is exactly the moment you need reminding to sync its rule
+   file and its routing row, and a rule fires there whether or not anyone remembered to look.
 
-Adapt this template to the project — add project-specific rules if needed (e.g., "When making
-UI changes, update ALL files listed in Design.md"). Drop the rows for components that don't exist,
-and drop the Deferred Components section if nothing was deferred. The goal is that a fresh Claude session
-reading CLAUDE.md knows exactly how to maintain the system, not just use it.
+→ **Templates:** `references/templates.md` § Harness maintenance doc, § Harness Maintenance trigger,
+and § Standard rule files (for `harness.md`).
 
-### Step 9b: Write Delegation Rules into CLAUDE.md
+Adapt to the project — add project-specific rules (e.g. "when making UI changes, update ALL files
+listed in Design.md"), drop rows for components that don't exist, and drop Deferred Components if
+nothing was deferred.
 
-On a large codebase the failure mode isn't a missing doc — it's one session trying to hold the
-whole system at once. Subagents are the lever: a subagent gets its own fresh context window, can
-read five arch docs and forty files, and returns a conclusion instead of the raw material.
+### Step 9b: Delegation Rules
 
-Add this to CLAUDE.md:
+On a large codebase the failure mode isn't a missing doc — it's one session trying to hold the whole
+system at once. Subagents are the lever: a fresh context window that reads five docs and forty files
+and returns a conclusion rather than the raw material.
 
-→ **Template:** `references/templates.md` § Delegation rules section of CLAUDE.md. Read it before writing the section.
-Sections: delegate-vs-do-it-yourself table / the name-the-docs-explicitly rule.
+This one stays in CLAUDE.md rather than moving to a doc. The choice to delegate happens *before* any
+file is opened, so there's no read to route on and no file edit to trigger a rule — it has to be
+already in context. Keep it to a few lines.
 
-Adapt the table to the project's actual domains. The point is that a fresh session knows when
-reading more is the wrong move.
+→ **Template:** `references/templates.md` § Delegation.
 
 ### Step 10: Present and Confirm
 

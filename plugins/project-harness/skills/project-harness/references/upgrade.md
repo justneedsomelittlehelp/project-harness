@@ -22,6 +22,9 @@ check whether it was created by an older version of this skill and patch in miss
 | No delegation rules in CLAUDE.md | v1.4.0 | Add the Step 9b section |
 | No Phase Boundary Audit in the maintenance rules | v1.4.0 | Add it, and run it once against the existing docs — expect to find stale paths |
 | Any file over its Context Budget | v1.4.0 | Report the overage to the user, then split per the budget table |
+| An 80-line Harness Maintenance section pasted into CLAUDE.md | v1.5.0 | Move the procedure to `architecture_docs/arch-harness.md`, leave the ~13-line trigger + a routing row, and create `.claude/rules/harness.md` |
+| No standard rule files (`harness.md`, `dependencies.md`, `reference-sync.md`) | v1.5.0 | Create them (Step 5b), and delete the maintenance table rows they now cover |
+| Maintenance table rows that are file-triggered | v1.5.0 | Move each into the rule file whose `paths` cover that edit; keep only conversational triggers in CLAUDE.md |
 
 **Upgrade rules:**
 

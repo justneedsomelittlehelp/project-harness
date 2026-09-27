@@ -2,6 +2,29 @@
 
 Versions of the `project-harness` skill.
 
+### v1.5.0
+
+Fixes a contradiction in v1.4.0: it set a 150-line CLAUDE.md budget, then told Step 9 to paste an
+80-line maintenance section into it. Pasting Step 9 and 9b as written produced a 161-line CLAUDE.md
+where 60% of the content was instructions about the docs rather than the project.
+
+- **Maintenance splits three ways.** The full procedure becomes
+  `architecture_docs/arch-harness.md` (read on demand, with its own routing row); CLAUDE.md keeps
+  ~13 lines of conversational triggers plus a pointer; and `.claude/rules/harness.md` carries the
+  file-edit triggers, firing automatically when Claude touches CLAUDE.md, an arch doc, the roadmap,
+  or a rule file. CLAUDE.md drops from 161 to ~84 lines and the triggers get *more* reliable, since
+  they no longer depend on a table row being remembered.
+- **Generalized the methodology.** New rule in Step 5b: **if a maintenance trigger is "you edited
+  file X," it belongs in a rule, not an advisory table.** Eight of the sixteen maintenance rows
+  qualified.
+- **Standard rule files** the skill now generates alongside the per-domain ones: `harness.md`
+  (invariant sync, routing rows, budgets), `dependencies.md` (`arch-foundations.md` + Tech Stack
+  table stay true when a manifest changes), `reference-sync.md` (`arch-reference.md` schema and
+  routes tables stay true when migrations or routes change), plus `design.md` and `security.md`
+  when those components exist.
+- **Delegation rules compressed** from 17 lines to 7, and kept in CLAUDE.md deliberately — the
+  choice to delegate happens before any file is opened, so there's nothing to route or trigger on.
+
 ### v1.4.0
 
 Scaling pass, aimed at large codebases where the limit is context rather than documentation.

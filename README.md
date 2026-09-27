@@ -11,7 +11,7 @@ Sets up a self-maintaining documentation system that gives Claude Code structure
 - **Phase roadmap** — sequential build phases with testable milestones
 - **Architecture docs** — domain-split reference docs with cross-references
 - **CLAUDE.md navigation hub** — "when working on X, read Y" routing table (auto-loaded every session)
-- **Domain rules** — per-domain invariants in `.claude/rules/` that auto-load when Claude reads matching files
+- **Domain rules** — invariants in `.claude/rules/` that auto-load when Claude reads matching files, so maintenance triggers fire mechanically instead of waiting to be remembered
 - **Design system doc** — colors, typography, component patterns with copy-paste code (optional)
 - **Security doc** — threat model + audit trail (optional)
 - **Context placement rules** — every project fact has exactly one home, so nothing drifts
@@ -122,6 +122,14 @@ The most important pattern. Lives in CLAUDE.md:
 This routes Claude to the right context at the right time — without it, architecture docs exist but get ignored.
 
 It's advisory, though: it only works if Claude reads CLAUDE.md, matches the task to a row, and opens the doc. So the harness also generates `.claude/rules/{domain}.md` files scoped with a `paths` glob, which Claude Code loads *automatically* when Claude reads a matching file. Those carry the domain's invariants; the arch doc carries the reasoning. The table fires on intent, the rules fire on file reads — different moments, both needed.
+
+### Mechanical Over Advisory
+
+Any rule phrased "when you edit file X, update Y" is generated as a path-scoped rule rather than a
+table row, so it fires on its own. That covers dependency manifests (keeping `arch-foundations.md`
+honest), migrations and routes (keeping `arch-reference.md` true), component and stylesheet edits,
+auth and env files, and the harness's own files. What's left in CLAUDE.md is the handful of triggers
+that depend on a conversation rather than a file change.
 
 ### Context Budgets
 
