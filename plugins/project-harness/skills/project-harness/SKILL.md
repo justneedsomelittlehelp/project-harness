@@ -1,15 +1,17 @@
 ---
 name: project-harness
-version: 1.1.0
+version: 1.4.0
 description: >
   Set up a structured AI-coding harness for any software project — phase roadmap, architecture docs,
-  CLAUDE.md navigation hub, design system doc, security doc, and memory index. Use this skill whenever
+  CLAUDE.md navigation hub, path-scoped domain rules, design system doc, and security doc. Use this
+  skill whenever
   the user says "set up a project", "start a new project", "create a harness", "scaffold docs",
   "set up CLAUDE.md", or wants to organize their codebase for AI-assisted development. Also trigger
   when the user wants to add structure to an existing project ("add architecture docs", "organize this
   project", "make this codebase AI-friendly", "set up project docs"), or when the user wants to
-  upgrade an existing harness ("upgrade harness", "update harness", "patch harness"). Works for any
-  tech stack and any project size.
+  upgrade an existing harness ("upgrade harness", "update harness", "patch harness"), or when the
+  user wants to add a previously deferred component ("add a design doc", "add a security doc").
+  Works for any tech stack and any project size.
 ---
 
 # Project Harness
@@ -32,16 +34,45 @@ A complete harness has these layers, each serving a distinct purpose:
 | **Roadmap** | `roadmap/PHASE_N.md` + `roadmap/README.md` | Execution plan — what to build, in what order |
 | **Architecture docs** | `architecture_docs/arch-{topic}.md` | Decision references — how and why things work |
 | **Navigation hub** | `CLAUDE.md` | Entry point — "when working on X, read Y" routing table |
-| **Design system** | `Design.md` (if project has UI) | Visual spec — colors, typography, component patterns with copy-paste code |
-| **Security doc** | `security_check/SECURITY.md` (if security-sensitive) | Threat model + audit trail |
-| **Memory index** | `.claude/` memory system | Cross-conversation context — brief pointers to authoritative docs |
+| **Domain rules** | `.claude/rules/{domain}.md` | Invariants that auto-load when Claude reads matching files |
+| **Design system** | `Design.md` *(optional)* | Visual spec — colors, typography, component patterns with copy-paste code |
+| **Security doc** | `security_check/SECURITY.md` *(optional)* | Threat model + audit trail |
+| **Context placement** | *(rules only — no new file)* | Every project fact has exactly one home, and CLAUDE.md stays thin |
 
-Not every project needs every layer. A CLI tool doesn't need Design.md. A static site doesn't need
-security_check/. Recommend what fits — don't force components that add no value.
+The roadmap, architecture docs, navigation hub, and domain rules are always created. **`Design.md`
+and `security_check/SECURITY.md` are optional, and the user decides — not you.** Ask about both
+explicitly at the start (Step 1c). Each can be included now, deferred to later in the project, or
+skipped as not applicable. Recommend what fits — a CLI tool doesn't need Design.md, a static site
+doesn't need security_check/ — but the call is the user's, and a deferral gets recorded rather than
+forgotten.
+
+### Context Budgets
+
+Two surfaces load in full at the start of every session: `CLAUDE.md` and Claude Code's auto memory
+index. Everything else is retrieved on demand. At scale that distinction is the whole game —
+always-loaded content competes with the actual task for the same window, so the harness keeps it
+small and pushes detail into files that are opened only when relevant.
+
+Hold these budgets. They're numbers rather than judgment calls, so a future session can check them:
+
+| File | Budget | When exceeded |
+|------|--------|---------------|
+| `CLAUDE.md` | ≤ 150 lines | Move a section to an arch doc or domain rule, leave a routing row behind |
+| `.claude/rules/{domain}.md` | ≤ 50 lines | It's carrying reasoning — move that to the arch doc |
+| `architecture_docs/arch-{domain}.md` | ≤ 500 lines | Split by sub-domain; the original becomes an index |
+| `roadmap/PHASE_N.md` | no limit | Only the active phase is ever linked from CLAUDE.md |
+
+Anthropic's guidance for CLAUDE.md is to target under 200 lines, since longer files consume more
+context and reduce adherence. The 150-line budget leaves headroom for rules the user adds later.
 
 ---
 
 ## How to Run This Skill
+
+File templates live in `references/templates.md`, and the upgrade procedure in
+`references/upgrade.md`, both alongside this file. Each step below says when to read them. **Don't
+write a harness file from memory when a template exists for it** — the templates carry structure the
+maintenance rules depend on.
 
 ### Step 1: Understand the Project
 
@@ -62,33 +93,50 @@ security_check/. Recommend what fits — don't force components that add no valu
 
 ### Step 1b: Upgrade an Existing Harness
 
-If the project already has a harness (CLAUDE.md with a routing table + `architecture_docs/` + `roadmap/`),
-check whether it was created by an older version of this skill and patch in missing components.
+If the project already has a harness (CLAUDE.md with a routing table + `architecture_docs/` +
+`roadmap/`), it may predate the current version of this skill and be missing components.
 
-**Detection**: Look for these signs of an older harness:
+→ **Read `references/upgrade.md` now.** It has the version-by-version detection table and the rules
+for patching without overwriting user content.
 
-| Missing component | Introduced in | What to do |
-|-------------------|---------------|------------|
-| `architecture_docs/arch-foundations.md` | v1.1.0 | Create it — gather stack rationale from the user and existing CLAUDE.md Tech Stack section |
-| CLAUDE.md Tech Stack has no "Why" column | v1.1.0 | Add the "Why" column to the existing table, ask user for rationale per choice |
-| No routing table entry for `arch-foundations.md` | v1.1.0 | Add the row to the routing table |
-| No "Technology added, removed, or swapped" row in maintenance rules | v1.1.0 | Add it to the "When to Update What" table in CLAUDE.md |
+If the user explicitly asked to upgrade ("upgrade harness"), run only that reference and skip the
+rest of this skill. If they asked to set up a harness and you detected an existing one, ask whether
+they want a full rebuild or just an upgrade.
 
-**Upgrade rules:**
 
-1. **Never overwrite existing content.** Read every file before modifying. Merge new sections into
-   existing structure — don't replace files wholesale.
-2. **Preserve user customizations.** If the user has added custom routing table rows, extra
-   maintenance rules, or modified templates, keep all of it.
-3. **Only patch what's missing.** If a component already exists and looks complete, skip it.
-4. **Tell the user what you're doing.** Before making changes, present a list of what's missing
-   and what you'll add. Wait for confirmation.
-5. **One-shot upgrade.** After patching, the harness should be fully current — no need to run
-   the upgrade again.
+### Step 1c: Decide Which Optional Components to Include
 
-If the user explicitly asked to upgrade (e.g., "upgrade harness"), run only Step 1b and skip
-the rest of the skill. If they asked to set up a harness and you detected an existing one,
-ask whether they want a full rebuild or just an upgrade.
+Before planning anything, settle which optional docs are part of this harness. Raise both questions
+in the opening conversation — don't decide silently and don't create these files on your own judgment.
+
+1. **Design system doc** — if the project has any UI surface, ask: "Do you want `Design.md` now
+   (colors, typography, component patterns with copy-paste code), or leave it until the visual
+   direction is settled?" For projects with no UI at all (CLI tools, libraries, background services),
+   say it doesn't apply and move on.
+2. **Security doc** — if the project touches auth, payments, user data, uploads, or anything
+   internet-facing, ask: "Do you want `security_check/SECURITY.md` now (threat model + audit trail),
+   or add it closer to production?"
+
+Give a recommendation with each question rather than presenting a bare menu. A design-led product
+benefits from `Design.md` on day one; an internal API probably never needs it. A project handling
+payments or PII should get `SECURITY.md` early; a weekend prototype can reasonably defer it.
+
+Three valid answers for each: **include now**, **defer**, or **not applicable**.
+
+**If a component is deferred**, don't silently drop it:
+
+- Record it under a "Deferred Components" heading in the CLAUDE.md Harness Maintenance section,
+  with the trigger for adding it — e.g. "Design.md — add when UI work starts (Phase 3)",
+  "SECURITY.md — add before the first production deploy".
+- Leave its routing table row out until the doc exists. A routing row pointing at a missing file is
+  worse than no row.
+- If there's an obvious phase where it becomes relevant, note it in that `PHASE_N.md` too.
+
+**If a component is not applicable**, skip it entirely — no deferred entry, no routing row.
+
+**Adding a deferred component later**: when the user asks for it on a project that already has a
+harness ("add a design doc", "add a security doc"), run only Step 6 or Step 7, then add the routing
+table row and delete the entry from Deferred Components.
 
 ### Step 2: Tech Stack Selection & Rationale
 
@@ -137,25 +185,8 @@ roadmap/
 ```
 
 **Phase file structure:**
-```markdown
-# Phase N: [Title]
-
-## Goal
-[One sentence — what this phase achieves]
-
-## What This Phase Builds On
-[Which previous phases must be complete, what's assumed to exist]
-
-## Database Changes (if any)
-[SQL CREATE/ALTER statements with inline comments explaining each column]
-
-## Implementation Steps
-[Numbered steps with enough detail that a developer can execute without guessing]
-
-## Test When Done
-- [ ] [Concrete verification step]
-- [ ] [Another verification step]
-```
+→ **Template:** `references/templates.md` § Phase file. Read it before writing the file.
+Sections: Goal / What This Phase Builds On / Database Changes / Implementation Steps / Test When Done.
 
 ### Step 4: Design the Architecture Docs
 
@@ -172,71 +203,31 @@ would need deep context to make changes safely. Common splits:
 rationale doc. It captures what was chosen, why, what alternatives were considered, and any
 constraints that drove the decisions. Structure:
 
-```markdown
-# Foundations & Tech Stack
-
-> **Read this when:** choosing a new library/tool, evaluating an alternative technology,
-> onboarding to the project, or questioning why a particular stack choice was made.
-> **Related docs:** all other arch docs (they assume this stack)
-
----
-
-## Stack Overview
-
-| Layer | Choice | Why |
-|-------|--------|-----|
-| Language | [e.g., TypeScript] | [e.g., team expertise + type safety for complex domain] |
-| Framework | [e.g., Next.js 14] | [e.g., SSR for SEO + API routes reduce infra complexity] |
-| Database | [e.g., PostgreSQL] | [e.g., relational data model, JSONB for flexible metadata] |
-| Auth | [e.g., NextAuth.js] | [e.g., built-in OAuth providers, session management] |
-| Deployment | [e.g., Vercel] | [e.g., zero-config Next.js deploys, preview environments] |
-| Package manager | [e.g., pnpm] | [e.g., faster installs, strict dependency resolution] |
-
-## Key Decisions & Trade-offs
-
-For each non-obvious stack choice, document:
-- **What was chosen** and **what was considered**
-- **Why this option won** (constraints, team skills, cost, ecosystem, performance)
-- **Known trade-offs** accepted with this choice
-
-## Constraints
-
-[Hard constraints that limit future stack decisions — e.g., "must run on AWS due to
-enterprise contract", "must support offline-first for field workers", "budget caps
-rule out per-seat SaaS tools"]
-
-## Stack Evolution Log
-
-| Date | Change | Reason |
-|------|--------|--------|
-| [date] | [e.g., Migrated from Jest to Vitest] | [e.g., 3x faster test runs, native ESM support] |
-```
+→ **Template:** `references/templates.md` § Foundations doc. Read it before writing the file.
+Sections: Stack Overview table / Key Decisions & Trade-offs / Constraints / Stack Evolution Log.
 
 This doc is a living record. When a technology is added, removed, or swapped, update the
 Stack Overview table and add an entry to the Stack Evolution Log (see Step 9 maintenance rules).
 
 For each **project-specific domain**, create `architecture_docs/arch-{domain}.md`:
 
-```markdown
-# [Domain Name]
+→ **Template:** `references/templates.md` § Domain arch doc. Read it before writing the file.
+Sections: header block (Read this when / Does NOT cover / Related docs) / Invariants / Core Concepts / Data Model / Flow / Edge Cases.
 
-> **Read this when working on:** [specific scenarios]
-> **Related docs:** [links to other arch docs that overlap]
+**The first 30 lines have to stand alone.** At scale these docs outgrow a single read, and a
+partial read is where confident wrong answers come from. The header block — read this when, does
+NOT cover, related docs, invariants — must be enough for Claude to tell whether it opened the right
+doc and to act safely if it reads nothing further. **Does NOT cover** is the line that prevents an
+authoritative-sounding answer about something the doc never addressed.
 
----
+**Cap each doc at ~500 lines.** Past that, split by sub-domain (`arch-payments-billing.md`,
+`arch-payments-webhooks.md`) and turn the original into an index whose routing rows point at the
+splits. A 2,000-line doc gets read partially or not at all, which defeats the purpose.
 
-## [Section 1: Core Concepts]
-[How this domain works, key decisions and WHY they were made]
-
-## [Section 2: Data Model]
-[Tables, columns, relationships — with purpose annotations]
-
-## [Section 3: Flow]
-[Step-by-step: what happens when a user does X]
-
-## [Section 4: Edge Cases & Gotchas]
-[Things that are easy to get wrong, non-obvious constraints]
-```
+**`arch-reference.md` is the anti-hallucination anchor.** It's the single authority for tables,
+columns, routes, and the file map — a flat lookup that makes any claim checkable in one read. Every
+statement elsewhere about a table, column, route, or path should be verifiable there, and when two
+docs disagree, `arch-reference.md` is what gets corrected first. Give it plain lookup tables, no prose.
 
 The cross-referencing between docs is critical. Each doc should link to related docs at the top
 so a developer landing in one doc can find adjacent context without going back to CLAUDE.md.
@@ -257,63 +248,58 @@ This makes it the ideal navigation hub — the first thing Claude reads before t
 If no CLAUDE.md exists, create one. Either way, the end result should be scannable and link to
 everything else. Target structure:
 
-```markdown
-# [Project Name]
-
-> [One-line description of what this project is]
-
-## Tech Stack
-
-| Layer | Choice | Why |
-|-------|--------|-----|
-| Language | [e.g., TypeScript 5.x] | [one-line rationale] |
-| Framework | [e.g., Next.js 14] | [one-line rationale] |
-| Database | [e.g., PostgreSQL 16] | [one-line rationale] |
-| Auth | [e.g., NextAuth.js] | [one-line rationale] |
-| Deployment | [e.g., Vercel] | [one-line rationale] |
-
-> Full stack rationale, trade-offs, and evolution log → `architecture_docs/arch-foundations.md`
-
-## Project Structure
-[Brief description of directory layout]
-
-## Architecture Docs (in `architecture_docs/`)
-
-Read the relevant doc before modifying backend logic, API routes, or data flow:
-
-| When working on | Read |
-|----------------|------|
-| Choosing a library/tool, questioning a stack choice, onboarding | `arch-foundations.md` |
-| [scenario] | `arch-{domain}.md` |
-| [scenario] | `arch-{domain}.md` |
-| [scenario] | `arch-{domain}.md` |
-| Looking up a table/column, finding a file | `arch-reference.md` |
-
-## [Database / Data Model]
-[Table names + one-line purpose, link to full schema]
-
-## [Security Rules] (if applicable)
-[Env var discipline, auth patterns, validation rules]
-
-## [Design System] (if applicable)
-[Link to Design.md, key constraints like "no dark mode"]
-
-## Coding Rules
-[Project-specific conventions the user wants enforced]
-
-## Environment Variables
-[Public vs server-side, with clear labels]
-
-## Build Status
-[What's done, what's in progress, what's planned]
-```
+→ **Template:** `references/templates.md` § CLAUDE.md. Read it before writing the file.
+Sections: Tech Stack / Project Structure / routing table / Domain Rules / Data Model / Security Rules / Design System / Coding Rules / Env Vars / Current Phase / Build Status.
 
 **The "when to read what" table is the most important part of CLAUDE.md.** It routes developers
 to the right architecture doc based on what they're about to touch. Without it, the architecture
 docs exist but nobody reads them at the right time. Every architecture doc you create MUST have
 a corresponding row in this table.
 
-### Step 6: Design System Doc (if project has UI)
+**Budget: ≤150 lines.** CLAUDE.md loads in full on every task, so every line costs context whether
+or not it's relevant to what's being worked on. When a section outgrows a few paragraphs, move it
+to an arch doc and leave a routing row, or to a domain rule if it's an invariant. Link only the
+*current* phase — a 12-phase project should cost the same at launch as a 2-phase one.
+
+### Step 5b: Domain Rules in `.claude/rules/`
+
+The routing table is **advisory** — it works only if Claude reads CLAUDE.md, recognizes that the
+task matches a row, and chooses to open the doc. That's a soft instruction competing with
+everything else in context, and on a large project it's exactly where "Claude forgot the rule"
+comes from.
+
+`.claude/rules/` is the **mechanical** counterpart. A rule file with a `paths` field in its
+frontmatter loads automatically when Claude reads a matching file — no decision, no routing lookup:
+
+→ **Template:** `references/templates.md` § Domain rule file. Read it before writing the file.
+Sections: `paths` frontmatter / invariant list / pointer to the arch doc.
+
+**Create one rule file per architecture domain.** Each holds that domain's invariants — mirrored
+from the arch doc's Invariants block — plus a pointer to the full doc. Nothing else. Reasoning,
+history, and flows stay in the arch doc, retrieved on demand.
+
+Rules for generating these:
+
+- **Invariants only, ≤50 lines.** If it explains *why*, it belongs in the arch doc. A rule file
+  past 50 lines is carrying reasoning it shouldn't.
+- **`paths` must match real directories.** Check the globs against the actual tree — a pattern
+  matching nothing is a rule that silently never fires. Syntax: `src/**/*.ts`, `src/api/**/*`,
+  `src/**/*.{ts,tsx}`.
+- **Every rule file ends with a pointer** to its arch doc, so the reasoning is one hop away.
+- **A rule file with no `paths` loads unconditionally** — same cost as CLAUDE.md. Reserve that for
+  genuinely project-wide invariants, and prefer CLAUDE.md for those anyway.
+- **Keep it in sync with the arch doc's Invariants block.** This is the one duplication the harness
+  accepts, because the two serve different retrieval paths. Step 9's maintenance rules make
+  updating both a single event.
+
+**This complements the routing table, it does not replace it.** Path-scoped rules fire when Claude
+*reads a matching file*, so they cover implementation but not planning. The routing table is what
+gets the arch doc open before any file is touched. Generate both.
+
+### Step 6: Design System Doc (optional — only if confirmed in Step 1c)
+
+Skip this step unless the user asked for it. If they deferred it, make sure it's listed under
+Deferred Components in CLAUDE.md instead.
 
 Create `Design.md` with:
 - Color palette (with exact values)
@@ -325,7 +311,13 @@ Create `Design.md` with:
 
 The code blocks are essential — they eliminate guesswork and ensure visual consistency.
 
-### Step 7: Security Doc (if security-sensitive)
+Add the routing table row for `Design.md` in CLAUDE.md as part of creating it, and remove any
+Deferred Components entry for it.
+
+### Step 7: Security Doc (optional — only if confirmed in Step 1c)
+
+Skip this step unless the user asked for it. If they deferred it, make sure it's listed under
+Deferred Components in CLAUDE.md instead.
 
 Create `security_check/SECURITY.md` with:
 - Architecture security overview (what protections exist)
@@ -335,27 +327,57 @@ Create `security_check/SECURITY.md` with:
 
 This file is a living audit trail, not a one-time document.
 
-### Step 8: Set Up Memory Structure
+Add the routing table row for `security_check/SECURITY.md` in CLAUDE.md as part of creating it, and
+remove any Deferred Components entry for it.
 
-Explain the memory system to the user: Claude Code's built-in memory (`MEMORY.md`) persists
-across conversations, but by default it's just flat notes. The harness turns it into an index
-that points to structured docs — so context survives not just between sessions, but grows
-more useful over time.
+### Step 8: Context Placement Rules
 
-**What goes in MEMORY.md (pointers + non-obvious context):**
-- One-line pointers to authoritative docs: "Auth architecture → `architecture_docs/arch-identity-access.md`"
-- Key decisions NOT derivable from code or git: "Chose Stripe over PayPal because of lower international fees"
-- Current project state: "Phase 3 complete, Phase 4 in progress"
-- External references: "Bug tracker is Linear project INVOICEFLOW"
+**The harness creates no memory file of its own.** Claude Code already has two mechanisms for
+carrying context across sessions, and the harness works with them instead of adding a third:
 
-**What does NOT go in MEMORY.md:**
-- Anything already in architecture docs (that's duplication, and it drifts)
-- Code patterns or file paths (read the code instead)
-- Git history summaries (use `git log`)
-- Debugging solutions (the fix is in the code, the context is in the commit message)
+| | Who writes it | Where | Committed? |
+|---|---|---|---|
+| **CLAUDE.md** | The user (and this skill, on their behalf) | project root | Yes |
+| **Auto memory** | Claude, on its own | `~/.claude/projects/<project>/memory/` | No — machine-local |
 
-The key discipline: MEMORY.md is an **index**, not a **store**. Every entry should either
-point to where the real information lives, or capture something that has no other home.
+`CLAUDE.md` is the user-authored channel, and it's the one the harness owns (Step 5). **Auto
+memory is Claude's own — don't create, structure, or manage it.** It's on by default, it skips
+anything derivable from the codebase and anything CLAUDE.md already says, and it needs no setup.
+Mention it to the user once, note that it's machine-local (not shared with teammates, not carried
+to another machine), and move on.
+
+A root-level `MEMORY.md` is not a thing Claude Code loads — only CLAUDE.md, `CLAUDE.local.md`,
+`AGENTS.md`, and `.claude/rules/` load at launch. Don't create one.
+
+What this step actually does is give every kind of project fact exactly one home. Explain the
+table below to the user, and follow it yourself for the rest of the project:
+
+| Fact | Home |
+|------|------|
+| Which doc to read for a given task | CLAUDE.md routing table |
+| Standing rules and conventions | CLAUDE.md Coding Rules |
+| Phase status | CLAUDE.md Build Status + `roadmap/README.md` |
+| A decision and the reasoning behind it | the relevant `architecture_docs/arch-{domain}.md` |
+| Why a technology was chosen | `arch-foundations.md` |
+| Table, column, route, or file lookup | `arch-reference.md` |
+| External references (issue tracker, dashboard, staging URL) | `arch-reference.md` |
+| What to build next | `roadmap/PHASE_N.md` |
+| Personal notes that shouldn't be committed | `CLAUDE.local.md` (add to `.gitignore`) |
+
+**Nothing gets two homes.** A fact duplicated between CLAUDE.md and an architecture doc will
+drift, and the stale copy is worse than no copy. When in doubt, put the detail in the architecture
+doc and leave a routing table row pointing at it.
+
+**Keep CLAUDE.md thin.** It loads in full at the start of every session, so everything in it costs
+context whether or not it's relevant to the current task. Anthropic's guidance is to target under
+200 lines — longer files consume more context and reduce adherence. Detail belongs in an
+architecture doc that the routing table reaches on demand. That's the entire reason the routing
+table exists.
+
+**`@import` is not a context shortcut.** A file pulled into CLAUDE.md with `@path` syntax is
+expanded and loaded at launch just like the rest of the file, so splitting content out organizes
+it without saving any context. Use imports for always-relevant content you want in its own file,
+never to smuggle long reference docs into every session.
 
 ### Step 9: Write Harness Maintenance Rules into CLAUDE.md
 
@@ -365,61 +387,34 @@ instructions, the docs go stale after a few sessions and become misleading — w
 Add a **Harness Maintenance** section to CLAUDE.md that encodes the self-improvement cycle.
 This section tells every future Claude session how to keep the harness alive:
 
-```markdown
-## Harness Maintenance
-
-This project uses a structured documentation harness. Follow these rules to keep it accurate:
-
-### When to Update What
-
-| Event | Update |
-|-------|--------|
-| Architecture decision made or changed | Update the relevant `architecture_docs/arch-{domain}.md` with the decision and reasoning |
-| Technology added, removed, or swapped | Update `arch-foundations.md` Stack Overview table + add a Stack Evolution Log entry. Update the Tech Stack table in CLAUDE.md to match |
-| New doc or reference file added | Add a routing entry to the "When working on / Read" table above |
-| Phase completed | Mark phase as done in `roadmap/README.md`, update Build Status section below |
-| New phase or scope change | Create/update `roadmap/PHASE_N.md`, update roadmap README |
-| Non-obvious decision worth preserving across sessions | Add a brief pointer to MEMORY.md (not a copy — link to the authoritative doc) |
-| New database table or column | Update `arch-reference.md` schema section |
-| New API route | Update `arch-reference.md` routes table |
-| UI component added or changed | Update `Design.md` component patterns and file list |
-| Security vulnerability found or fixed | Update `security_check/SECURITY.md` with numbered entry |
-
-### Where Information Lives (don't put things in the wrong place)
-
-- **CLAUDE.md** — Navigation + quick rules. Keep it scannable. If a section grows beyond a few
-  paragraphs, move details to a dedicated doc and leave a pointer here.
-- **Architecture docs** — Detailed reasoning, flows, data models, edge cases. This is where
-  the "why" behind decisions lives. Update these as decisions are made during development.
-  `arch-foundations.md` specifically owns tech stack rationale — always update it (and CLAUDE.md's
-  Tech Stack table) when a technology is added, removed, or changed.
-- **MEMORY.md** — Brief one-line pointers to docs + things NOT derivable from code or git
-  history (e.g., "auth middleware rewrite driven by legal compliance, not tech debt").
-  Never duplicate content from architecture docs here.
-- **Roadmap phases** — Execution specs. Once a phase is complete, don't modify it (it's a
-  historical record). Update the README status instead.
-
-### The Self-Improvement Cycle
-
-After completing significant work (finishing a phase, making an architecture decision, fixing
-a security issue), update the harness before moving on:
-
-1. Update the relevant architecture doc with what was decided and why
-2. Update CLAUDE.md if the routing table or build status changed
-3. Add a MEMORY.md pointer if the decision isn't obvious from code
-4. Mark the phase complete in the roadmap if applicable
-```
+→ **Template:** `references/templates.md` § Harness Maintenance section of CLAUDE.md. Read it before writing the section.
+Sections: When to Update What / Where Information Lives / Deferred Components / Phase Boundary Audit / The Self-Improvement Cycle.
 
 Adapt this template to the project — add project-specific rules if needed (e.g., "When making
-UI changes, update ALL files listed in Design.md"). The goal is that a fresh Claude session
+UI changes, update ALL files listed in Design.md"). Drop the rows for components that don't exist,
+and drop the Deferred Components section if nothing was deferred. The goal is that a fresh Claude session
 reading CLAUDE.md knows exactly how to maintain the system, not just use it.
+
+### Step 9b: Write Delegation Rules into CLAUDE.md
+
+On a large codebase the failure mode isn't a missing doc — it's one session trying to hold the
+whole system at once. Subagents are the lever: a subagent gets its own fresh context window, can
+read five arch docs and forty files, and returns a conclusion instead of the raw material.
+
+Add this to CLAUDE.md:
+
+→ **Template:** `references/templates.md` § Delegation rules section of CLAUDE.md. Read it before writing the section.
+Sections: delegate-vs-do-it-yourself table / the name-the-docs-explicitly rule.
+
+Adapt the table to the project's actual domains. The point is that a fresh session knows when
+reading more is the wrong move.
 
 ### Step 10: Present and Confirm
 
 Before creating any files, present the full harness plan to the user:
-- Which components you'll create
+- Which components you'll create now, which are deferred (with their triggers), and which don't apply
 - The directory structure
-- The architecture doc domains you identified
+- The architecture doc domains you identified, and the `paths` globs each domain rule will match
 - The phase breakdown
 
 Wait for explicit confirmation. Then create all files.
@@ -428,12 +423,21 @@ Wait for explicit confirmation. Then create all files.
 
 ## Important Principles
 
+**Always-loaded is the scarce resource.** `CLAUDE.md` and the auto memory index load on every task;
+everything else is retrieved only when relevant. Design for that split — small always-loaded
+surfaces that route well, and detailed docs that are cheap to open and safe to read partially. A
+harness that puts everything in CLAUDE.md is just a slower way of putting everything in context.
+
+**Two retrieval paths, both needed.** The routing table is advisory and fires on intent; path-scoped
+rules are mechanical and fire on file reads. Neither covers the other's case. Generate both.
+
 **Don't create empty shells.** Every file should have real content based on what you learned
 in the conversation. A PHASE_1.md that says "TBD" is worse than no file at all.
 
 **The harness evolves — and that's the whole point.** A harness that's set up once and never
 updated is just stale documentation. The real value comes from the maintenance cycle: decisions
-get recorded in architecture docs, CLAUDE.md stays current, MEMORY.md points to what matters.
+get recorded in architecture docs, and CLAUDE.md stays current so the routing table still points
+at the right ones.
 The maintenance rules (Step 9) baked into CLAUDE.md are what make this happen automatically
 across sessions — without them, the harness decays within weeks.
 
@@ -445,28 +449,11 @@ add a corresponding routing entry in CLAUDE.md.
 **Keep CLAUDE.md scannable.** It's a navigation hub, not a novel. If a section grows beyond
 a few paragraphs, it should become its own doc with a pointer from CLAUDE.md.
 
+**Optional means the user decides.** `Design.md` and `security_check/SECURITY.md` are proposed with
+a recommendation, never assumed. A deferred component is recorded with its trigger so it resurfaces
+at the right time instead of being quietly lost.
+
 **Adapt to the project.** A weekend hackathon needs a lighter harness than a production SaaS.
 A solo developer needs different docs than a team of 10. Scale the harness to match the project's
 actual complexity — over-documenting a simple project creates maintenance burden that outweighs
 the benefit.
-
----
-
-## Changelog
-
-### v1.1.0
-
-- **Tech stack rationale**: Step 2 now captures *why* each stack choice was made, for both new
-  and existing projects. CLAUDE.md Tech Stack table includes a "Why" column.
-- **`arch-foundations.md`**: New mandatory architecture doc for every project — full stack
-  rationale, trade-offs, constraints, and a Stack Evolution Log for tracking changes over time.
-- **Maintenance rules**: Added tech stack change trigger — when a technology is added, removed,
-  or swapped, both `arch-foundations.md` and CLAUDE.md Tech Stack table must be updated.
-- **Upgrade path (Step 1b)**: Detects existing harnesses from older versions and patches in
-  missing components without overwriting user content. Supports "upgrade harness" trigger.
-- **Versioning**: Added `version` field to skill frontmatter.
-
-### v1.0.0
-
-- Initial release: phase roadmap, architecture docs, CLAUDE.md navigation hub, design system
-  doc, security doc, memory index, and self-maintaining harness cycle.
